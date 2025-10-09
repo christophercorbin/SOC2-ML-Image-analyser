@@ -1,0 +1,197 @@
+# ================================================
+# SOC2 ML Image Analyzer - .gitignore
+# Enterprise-grade Python + AWS + Docker project
+# ================================================
+
+# ================================================
+# Python
+# ================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST.in
+
+# ================================================
+# Testing
+# ================================================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+.pytest/
+
+# ================================================
+# Environment & Configuration
+# ================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+
+# ================================================
+# AWS & Cloud Secrets (CRITICAL - SOC2 Compliance)
+# ================================================
+*.aws/credentials
+*.aws/config
+aws-credentials
+aws-config
+.aws/
+*.pem
+*.ppk
+secrets.json
+service-account.json
+gcp-credentials.json
+.terraform/
+terraform.tfstate*
+terraform.tfvars
+*.tfvars
+
+# ================================================
+# Docker & Container
+# ================================================
+Dockerfile.local
+.dockerignore.local
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# ================================================
+# ML & Data
+# ================================================
+*.model
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+*.weights
+checkpoints/
+models/
+data/
+datasets/
+*.csv
+*.parquet
+*.feather
+*.arrow
+
+# DeepFace specific
+.deepface/
+weights/
+
+# ================================================
+# IDE & Editors
+# ================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ================================================
+# Logs & Monitoring
+# ================================================
+*.log
+logs/
+log/
+*.out
+
+# ================================================
+# Temporary & Cache
+# ================================================
+tmp/
+temp/
+.tmp/
+.cache/
+node_modules/
+*.tmp
+*.temp
+
+# ================================================
+# CI/CD & Build Artifacts
+# ================================================
+.github/workflows/*.log
+build-artifacts/
+deploy-artifacts/
+*.zip
+*.tar.gz
+*.tar
+
+# ================================================
+# Security & Compliance
+# ================================================
+security-scan-results/
+vulnerability-reports/
+pen-test-reports/
+sec-*.json
+security.log
+audit.log
+
+# ================================================
+# Development & Local Files
+# ================================================
+local/
+.local/
+dev/
+.dev/
+playground/
+scratch/
+experiments/
+
+# ================================================
+# Documentation Build
+# ================================================
+docs/_build/
+docs/build/
+.sphinx/
+site/
+
+# ================================================
+# Cleanup folders (from repo restructure)
+# ================================================
+cleanup_folders/
