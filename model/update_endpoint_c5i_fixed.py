@@ -14,18 +14,22 @@ print(f'Creating / Updating endpoint for: {args.env}')
 # Initialize SageMaker client
 sagemaker = boto3.client('sagemaker', region_name='us-east-1')
 
-if args.env == 'personal':
-    model_name = 'defenderImageAnalyzerPersonal'
-    endpoint_name = 'defenderImageAnalyzerPersonalC5i'
+# Use environment-specific model and endpoint names that match the GitHub Actions workflow
+if args.env == 'prod':
+    model_name = 'soc2MlImageAnalyzerProd'
+    endpoint_name = 'soc2MlImageAnalyzerEndpointProd'
+elif args.env == 'staging' or args.env == 'stage':
+    model_name = 'soc2MlImageAnalyzerStaging'
+    endpoint_name = 'soc2MlImageAnalyzerEndpointStaging'
+elif args.env == 'personal':
+    model_name = 'soc2MlImageAnalyzerPersonal'
+    endpoint_name = 'soc2MlImageAnalyzerEndpointPersonal'
 elif args.env == 'soc2':
-    model_name = 'defenderImageAnalyzerSOC2Hardened'
-    endpoint_name = 'defenderImageAnalyzerSOC2HardenedDev'  # Default to dev for SOC 2
-else:
-    model_name = 'defenderImageAnalyzer'
-    if args.env in ['dev', 'stage', 'prod']:
-        endpoint_name = 'defenderImageAnalyzerEndpointC5i'
-    else:
-        endpoint_name = 'defenderImageAnalyzerEndpointC5i-test'
+    model_name = 'soc2MlImageAnalyzerHardened'
+    endpoint_name = 'soc2MlImageAnalyzerEndpointSOC2'
+else:  # dev and other environments
+    model_name = 'soc2MlImageAnalyzerDev'
+    endpoint_name = 'soc2MlImageAnalyzerEndpointDev'
 timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')  # More precise timestamp
 endpoint_config_name = f'{endpoint_name}-{timestamp}'
 
@@ -46,11 +50,21 @@ except ClientError as e:
     print(f'Error: Model {model_name} not found: {e}')
     raise
 
+# Determine instance type based on environment (matching GitHub Actions workflow)
+if args.env == 'prod':
+    instance_type = 'ml.c5.large'
+elif args.env == 'staging' or args.env == 'stage':
+    instance_type = 'ml.c5.large'
+else:  # dev and other environments
+    instance_type = 'ml.t3.medium'
+
+print(f'Using instance type: {instance_type}')
+
 # Create endpoint configuration with explicit settings to force refresh
 endpoint_config_response = sagemaker.create_endpoint_config(
     EndpointConfigName=endpoint_config_name,
     ProductionVariants=[{
-        'InstanceType': 'ml.c5.large',
+        'InstanceType': instance_type,
         'InitialInstanceCount': 1,
         'ModelName': model_name,
         'VariantName': 'AllTraffic',
