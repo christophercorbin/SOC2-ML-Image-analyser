@@ -221,21 +221,22 @@ jobs:
           # Login to AWS ML registry for base images
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
           
-          # Build with multiple tags
+          # Build with improved tagging strategy
+          # Each environment repo only gets 'latest' tag (no redundant env-latest)
           docker build --platform linux/amd64 -f ${{ env.DOCKERFILE }} \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_SHA \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT-latest .
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT .
           
           # Push all tags
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_SHA
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT-latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT
           
           echo "✅ SOC2 hardened images pushed successfully to $ECR_REPOSITORY"
           echo "📸 Latest: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           echo "🏷️  Commit: $ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_SHA"
-          echo "🌍 Environment: $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT-latest"
+          echo "🌍 Environment: $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT"
 
       - name: Get image digest
         id: get-digest
