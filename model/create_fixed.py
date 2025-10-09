@@ -13,58 +13,41 @@ args = parser.parse_args()
 
 print(f'Creating model for: {args.env}')
 
-# Environment-specific configuration (using placeholders for security)
-# In production, these would be loaded from environment variables or AWS Parameter Store
-env_configs = {
-    'dev': {
-        'role': 'arn:aws:iam::{{DEV_ACCOUNT_ID}}:role/aws-sagemaker-role',
-        'registry': '{{DEV_ACCOUNT_ID}}.dkr.ecr.us-east-1.amazonaws.com'
-    },
-    'stage': {
-        'role': 'arn:aws:iam::{{STAGE_ACCOUNT_ID}}:role/aws-sagemaker-role',
-        'registry': '{{STAGE_ACCOUNT_ID}}.dkr.ecr.us-east-1.amazonaws.com'
-    },
-    'prod': {
-        'role': 'arn:aws:iam::{{PROD_ACCOUNT_ID}}:role/sagemaker-execution-role',
-        'registry': '{{PROD_ACCOUNT_ID}}.dkr.ecr.us-east-1.amazonaws.com'
-    }
-}
+# For CI/CD and dynamic environments, always detect account ID dynamically
+# Get current AWS account ID for any environment
+sts = boto3.client('sts')
+account_id = sts.get_caller_identity()['Account']
+print(f'Using AWS account ID: {account_id}')
 
-if args.env in env_configs:
-    role = env_configs[args.env]['role']
-    registry = env_configs[args.env]['registry']
-else:  # personal or soc2 environment
-    # Get current AWS account ID for personal/soc2 environment
-    sts = boto3.client('sts')
-    account_id = sts.get_caller_identity()['Account']
+# Try common SageMaker role names
+iam = boto3.client('iam')
+possible_roles = [
+    'SageMakerExecutionRole',  # SOC 2 preferred
+    'SageMaker-ExecutionRole',
+    'AmazonSageMaker-ExecutionRole',
+    f'SageMaker-ExecutionRole-{account_id}',
+    'service-role/SageMakerRole',
+    'aws-sagemaker-role',
+    'sagemaker-execution-role'
+]
+
+role = None
+for role_name in possible_roles:
+    try:
+        iam.get_role(RoleName=role_name)
+        role = f'arn:aws:iam::{account_id}:role/{role_name}'
+        print(f'Found SageMaker role: {role_name}')
+        break
+    except iam.exceptions.NoSuchEntityException:
+        continue
+
+if not role:
+    # Fallback to default name (will be created by deployment script if needed)
+    role = f'arn:aws:iam::{account_id}:role/SageMakerExecutionRole'
+    print(f'Using default SageMaker role name (may need creation)')
     
-    # Try common SageMaker role names
-    iam = boto3.client('iam')
-    possible_roles = [
-        'SageMakerExecutionRole',  # SOC 2 preferred
-        'SageMaker-ExecutionRole',
-        'AmazonSageMaker-ExecutionRole',
-        f'SageMaker-ExecutionRole-{account_id}',
-        'service-role/SageMakerRole'
-    ]
-    
-    role = None
-    for role_name in possible_roles:
-        try:
-            iam.get_role(RoleName=role_name)
-            role = f'arn:aws:iam::{account_id}:role/{role_name}'
-            print(f'Found SageMaker role: {role_name}')
-            break
-        except iam.exceptions.NoSuchEntityException:
-            continue
-    
-    if not role:
-        # Fallback to default name (will be created by deployment script if needed)
-        role = f'arn:aws:iam::{account_id}:role/SageMakerExecutionRole'
-        print(f'Using default SageMaker role name (may need creation)')
-        
-    registry = f'{account_id}.dkr.ecr.us-east-1.amazonaws.com'
-    print(f'Using {args.env} environment with account: {account_id}')
+registry = f'{account_id}.dkr.ecr.us-east-1.amazonaws.com'
+print(f'Using {args.env} environment with account: {account_id}')
 
 # Initialize clients
 sagemaker = boto3.client('sagemaker', region_name='us-east-1')

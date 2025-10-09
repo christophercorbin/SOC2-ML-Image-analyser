@@ -30,7 +30,6 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: soc2-ml-image-analyzer
   DOCKERFILE: Dockerfile.hardened
 
 jobs:
@@ -143,6 +142,7 @@ jobs:
       image-digest: ${{ steps.get-digest.outputs.digest }}
       commit-sha: ${{ steps.vars.outputs.sha }}
       environment: ${{ steps.determine-env.outputs.environment }}
+      ecr-repository: ${{ steps.determine-env.outputs.ecr-repository }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -151,18 +151,39 @@ jobs:
         id: vars
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Determine target environment
+      - name: Determine target environment and ECR repository
         id: determine-env
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
           elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "environment=prod" >> $GITHUB_OUTPUT
+            ENVIRONMENT="prod"
           elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
-            echo "environment=staging" >> $GITHUB_OUTPUT
+            ENVIRONMENT="staging"
           else
-            echo "environment=dev" >> $GITHUB_OUTPUT
+            ENVIRONMENT="dev"
           fi
+          
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          
+          # Set ECR repository based on environment
+          case $ENVIRONMENT in
+            "prod")
+              echo "ecr-repository=soc2ml-prod" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "ecr-repository=soc2ml-staging" >> $GITHUB_OUTPUT
+              ;;
+            "dev")
+              echo "ecr-repository=soc2ml-dev" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "ecr-repository=soc2ml-dev" >> $GITHUB_OUTPUT
+              ;;
+          esac
+          
+          echo "🎯 Environment: $ENVIRONMENT"
+          echo "📦 ECR Repository: $(echo $ENVIRONMENT | sed 's/prod/soc2ml-prod/; s/staging/soc2ml-staging/; s/dev/soc2ml-dev/')"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -176,48 +197,54 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Create ECR repository if needed
+        env:
+          ECR_REPOSITORY: ${{ steps.determine-env.outputs.ecr-repository }}
         run: |
-          echo "📦 Ensuring ECR repository exists..."
-          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || \
+          echo "📦 Ensuring ECR repository exists: $ECR_REPOSITORY"
+          aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
           aws ecr create-repository \
-            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --repository-name $ECR_REPOSITORY \
             --region ${{ env.AWS_REGION }} \
             --image-scanning-configuration scanOnPush=true
-          echo "✅ ECR repository ready with vulnerability scanning enabled"
+          echo "✅ ECR repository $ECR_REPOSITORY ready with vulnerability scanning enabled"
 
       - name: Build and push SOC2 hardened image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ steps.determine-env.outputs.ecr-repository }}
           COMMIT_SHA: ${{ steps.vars.outputs.sha }}
           ENVIRONMENT: ${{ steps.determine-env.outputs.environment }}
         run: |
           echo "🔨 Building SOC2 hardened image for $ENVIRONMENT..."
+          echo "📦 Using ECR repository: $ECR_REPOSITORY"
           
           # Login to AWS ML registry for base images
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
           
           # Build with multiple tags
           docker build --platform linux/amd64 -f ${{ env.DOCKERFILE }} \
-            -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest \
-            -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$COMMIT_SHA \
-            -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$ENVIRONMENT-latest .
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_SHA \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT-latest .
           
           # Push all tags
-          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
-          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$COMMIT_SHA
-          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$ENVIRONMENT-latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_SHA
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT-latest
           
-          echo "✅ SOC2 hardened images pushed successfully"
-          echo "📸 Latest: $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest"
-          echo "🏷️  Commit: $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$COMMIT_SHA"
-          echo "🌍 Environment: $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$ENVIRONMENT-latest"
+          echo "✅ SOC2 hardened images pushed successfully to $ECR_REPOSITORY"
+          echo "📸 Latest: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          echo "🏷️  Commit: $ECR_REGISTRY/$ECR_REPOSITORY:$COMMIT_SHA"
+          echo "🌍 Environment: $ECR_REGISTRY/$ECR_REPOSITORY:$ENVIRONMENT-latest"
 
       - name: Get image digest
         id: get-digest
+        env:
+          ECR_REPOSITORY: ${{ steps.determine-env.outputs.ecr-repository }}
         run: |
-          echo "🔍 Fetching image digest from ECR..."
+          echo "🔍 Fetching image digest from ECR repository: $ECR_REPOSITORY"
           DIGEST=$(aws ecr describe-images \
-            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --repository-name $ECR_REPOSITORY \
             --region ${{ env.AWS_REGION }} \
             --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageDigest' \
             --output text)
@@ -306,12 +333,14 @@ jobs:
           IMAGE_DIGEST: ${{ needs.build-and-test.outputs.image-digest }}
           MODEL_NAME: ${{ steps.deploy-vars.outputs.model-name }}
           ENVIRONMENT: ${{ needs.build-and-test.outputs.environment }}
+          ECR_REPOSITORY: ${{ needs.build-and-test.outputs.ecr-repository }}
         run: |
           echo "🤖 Creating SageMaker model with SOC2 hardened image..."
+          echo "📦 Using ECR repository: $ECR_REPOSITORY"
           python3 model/create_fixed.py \
             --env $ENVIRONMENT \
             --image-digest $IMAGE_DIGEST \
-            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --repository-name $ECR_REPOSITORY \
             --model-name $MODEL_NAME
           echo "✅ SageMaker model created: $MODEL_NAME"
 
@@ -378,10 +407,11 @@ jobs:
           ENDPOINT_NAME: ${{ steps.deploy-vars.outputs.endpoint-name }}
           IMAGE_DIGEST: ${{ needs.build-and-test.outputs.image-digest }}
           COMPLIANCE_SCORE: ${{ needs.security-compliance.outputs.compliance-score }}
+          ECR_REPOSITORY: ${{ needs.build-and-test.outputs.ecr-repository }}
         run: |
           echo "🎉 SOC2 ML Image Analyzer Deployment Summary"
           echo "=============================================="
-          echo "🏷️  Repository: ${{ env.ECR_REPOSITORY }}"
+          echo "🏷️  ECR Repository: $ECR_REPOSITORY"
           echo "🌍 Environment: $ENVIRONMENT"
           echo "🤖 Model: ${{ steps.deploy-vars.outputs.model-name }}"
           echo "🔗 Endpoint: $ENDPOINT_NAME"
