@@ -159,7 +159,7 @@ jobs:
           elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
             ENVIRONMENT="prod"
           elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
-            ENVIRONMENT="staging"
+            ENVIRONMENT="stage"
           else
             ENVIRONMENT="dev"
           fi
@@ -171,7 +171,7 @@ jobs:
             "prod")
               echo "ecr-repository=soc2ml-prod" >> $GITHUB_OUTPUT
               ;;
-            "staging")
+            "stage")
               echo "ecr-repository=soc2ml-staging" >> $GITHUB_OUTPUT
               ;;
             "dev")
@@ -183,7 +183,7 @@ jobs:
           esac
           
           echo "🎯 Environment: $ENVIRONMENT"
-          echo "📦 ECR Repository: $(echo $ENVIRONMENT | sed 's/prod/soc2ml-prod/; s/staging/soc2ml-staging/; s/dev/soc2ml-dev/')"
+          echo "📦 ECR Repository: $(echo $ENVIRONMENT | sed 's/prod/soc2ml-prod/; s/stage/soc2ml-staging/; s/dev/soc2ml-dev/')"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -311,7 +311,7 @@ jobs:
               echo "endpoint-name=soc2MlImageAnalyzerEndpointProd" >> $GITHUB_OUTPUT
               echo "instance-type=ml.c5.large" >> $GITHUB_OUTPUT
               ;;
-            "staging")
+            "stage")
               echo "model-name=soc2MlImageAnalyzerStaging" >> $GITHUB_OUTPUT
               echo "endpoint-name=soc2MlImageAnalyzerEndpointStaging" >> $GITHUB_OUTPUT
               echo "instance-type=ml.c5.large" >> $GITHUB_OUTPUT
