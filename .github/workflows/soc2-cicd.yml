@@ -318,7 +318,7 @@ jobs:
             *)
               echo "model-name=soc2MlImageAnalyzerDev" >> $GITHUB_OUTPUT
               echo "endpoint-name=soc2MlImageAnalyzerEndpointDev" >> $GITHUB_OUTPUT
-              echo "instance-type=ml.t3.medium" >> $GITHUB_OUTPUT
+              echo "instance-type=ml.c5.large" >> $GITHUB_OUTPUT
               ;;
           esac
 

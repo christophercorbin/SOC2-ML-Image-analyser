@@ -50,13 +50,13 @@ except ClientError as e:
     print(f'Error: Model {model_name} not found: {e}')
     raise
 
-# Determine instance type based on environment (matching GitHub Actions workflow)
+# Determine instance type based on environment (using valid SageMaker endpoint instances)
 if args.env == 'prod':
     instance_type = 'ml.c5.large'
 elif args.env == 'staging' or args.env == 'stage':
     instance_type = 'ml.c5.large'
-else:  # dev and other environments
-    instance_type = 'ml.t3.medium'
+else:  # dev and other environments - use smallest valid instance
+    instance_type = 'ml.c5.large'  # ml.t3.medium is not supported for endpoints
 
 print(f'Using instance type: {instance_type}')
 
